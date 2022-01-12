@@ -1,35 +1,37 @@
-from tweepy.streaming import StreamListener
-from tweepy import OAuthHandler
-from tweepy import Stream
+#from tweepy.streaming import StreamListener
+#from tweepy import OAuthHandler
+#from tweepy import Stream
+import tweepy
 import json
 import boto3
 import time
-
 import twitter_credentials
+import sys
+sys.path.append('..')
 from helper.extract_tweet_info import extract_tweet_info
 
 
-class TweetStreamListener(StreamListener):
+class TweetStreamListener(tweepy.Stream):
     # on success
     def on_data(self, data):
         """Summary
-        
+
         Args:
             data (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
         tweet = json.loads(data)
         try:
             message = extract_tweet_info(tweet)
+            print(message)
             # only put the record when message is not None
             if (message):
-                firehose_client.put_record(
-                    DeliveryStreamName=delivery_stream_name,
-                    Record={
-                        'Data': message
-                    }
+                kinesis_client.put_record(
+                    StreamName=delivery_stream_name,
+                    Data=json.dumps(message),
+                    PartitionKey="partitionkey"
                 )
         except (AttributeError, Exception) as e:
             print(e)
@@ -41,32 +43,26 @@ class TweetStreamListener(StreamListener):
 
 if __name__ == '__main__':
     # create kinesis client connection
-    session = boto3.Session(profile_name='chuangxin')
+    session = boto3.Session(profile_name='python')
 
-    # create the kinesis firehose client
-    # firehose_client = <your code here>
-    firehose_client = session.client('firehose', region_name='us-east-1')
-    # firehose_client = session.client()
+    # create the kinesis kinesis client
+    kinesis_client = session.client('kinesis', region_name='us-east-1')
 
     # Set kinesis data stream name
-    delivery_stream_name = "twitter-data"
-
-    # set twitter keys/tokens
-    auth = OAuthHandler(twitter_credentials.consumer_key, twitter_credentials.consumer_secret)
-    auth.set_access_token(twitter_credentials.access_token, twitter_credentials.access_token_secret)
+    delivery_stream_name = "twitter-data-kinesis"
 
     while True:
         try:
             print('Twitter streaming...')
 
-            # create instance of the tweet stream listener
-            myStreamlistener = TweetStreamListener()
-
             # create instance of the tweepy stream
-            stream = Stream(auth=auth, listener=myStreamlistener)
+            stream = TweetStreamListener(
+                twitter_credentials.consumer_key, twitter_credentials.consumer_secret,
+                twitter_credentials.access_token, twitter_credentials.access_token_secret
+            )
 
             # search twitter for the keyword
-            stream.filter(track=["#AI", "#MachineLearning"], languages=['en'], stall_warnings=True)
+            stream.filter(track=["#AI", "#MachineLearning"], languages=['en'])
         except Exception as e:
             print(e)
             print('Disconnected...')

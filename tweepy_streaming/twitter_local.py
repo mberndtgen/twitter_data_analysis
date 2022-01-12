@@ -4,13 +4,9 @@
 
 # Import tweepy libraries
 import json
-from tweepy.streaming import StreamListener
-from tweepy import OAuthHandler
-from tweepy import Stream
-# a python file you store your twitter credentials (in the same directory)
-import twitter_credentials
+import tweepy
+import twitter_credentials # python file you store your twitter credentials (in the same directory)
 import pandas as pd
-# from textblob import TextBlob
 import re
 
 
@@ -21,12 +17,10 @@ def decode_hashtags(hashtags):
         return ""
 
 # Define how you are going to parse the JSON response from twitter API in the on_data function below
-class TweetStreamListener(StreamListener):
+class TweetStreamListener(tweepy.Stream):
     """
     Notes: the current implementation of tweepy uses the twitter API v1.1
     """
-    def __init__(self, fetched_tweets_fname = None):
-        self.fetched_tweets_fname = fetched_tweets_fname
 
     # on success
     def on_data(self, data):
@@ -87,10 +81,8 @@ class TweetStreamListener(StreamListener):
 
         message = "\t".join(message_lst)
 
-        if self.fetched_tweets_fname:
-            with open(self.fetched_tweets_fname, 'a+') as tf:
-                tf.write(message)
-        else:
+        with open("../twitter_data/twitter_data_fetched.txt", 'a+') as tf:
+            tf.write(message)
             print(message)
 
         return True
@@ -113,15 +105,14 @@ def load_to_csv(fName):
 
 # Provide the filtering criteria below and start the stream listener
 if __name__ == '__main__':
-    # create instance of the tweepy tweet stream listener
-    listener = TweetStreamListener(fetched_tweets_fname="./twitter_data/twitter_data_fetched_test_4.txt")
     # set twitter keys/tokens
-    # your need to provide these variables twitter credential,
-    # where I sotre in the twitter_credentials.py file.
+    # secrets stored in credential file twitter_credentials.py with
     # consumer_key, consumer_secret, access_token, access_token_secret
-    auth = OAuthHandler(twitter_credentials.consumer_key, twitter_credentials.consumer_secret)
-    auth.set_access_token(twitter_credentials.access_token, twitter_credentials.access_token_secret)
     # create instance of the tweepy stream
-    stream = Stream(auth, listener, tweet_mode="extended") # tweet_mode = "extended"
+    stream = TweetStreamListener(
+        twitter_credentials.consumer_key, twitter_credentials.consumer_secret,
+        twitter_credentials.access_token, twitter_credentials.access_token_secret
+    )
+    # tweet_mode = "extended"
     # search twitter for "tweet" keyword
     stream.filter(track=["#AI", "#MachineLearning"], languages=["en"]) # language = "English"
